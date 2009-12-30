@@ -1,5 +1,6 @@
 from applications.sw_exporter.modules.facebook import *
 from applications.sw_exporter.settings import *
+
 import datetime
 import time
 import rdflib
@@ -18,9 +19,7 @@ foafp = "http://xmlns.com/foaf/0.1/"
 # TODO:
 # strip out spaces/newlines/&#10 from websites attribute (make separate website properties)
 # deal with websites that start with "www"
-# factor out facebook settings from this page.
 # Generic functions to add triples from either friends or myself.
-# Can we find out who our friends are friends with? --- NO (at least, not without a huge search)
 # request users email and foaf:Person URI
 # Allow users to show only their info, not their friends.
 # Direct links to triples, for saving.
