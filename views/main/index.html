@@ -1,22 +1,22 @@
 <fb:header>Semantic Web Exporter</fb:header>
 <p>Congratulations, {{=count}} triples have been found.</p>
 <fb:tabs>
-<fb:tab-item href='/sw_exporter/main/index?format=rdf' title='RDF/XML'
+<fb:tab-item href='index?format=rdf' title='RDF/XML'
 {{ if format == 'rdf':}}
 selected='true'
 {{pass}}
 />
-<fb:tab-item href='/sw_exporter/main/index?format=n3' title='N3' 
+<fb:tab-item href='index?format=n3' title='N3' 
 {{ if format == 'n3':}}
 selected='true'
 {{pass}}
 />
-<fb:tab-item href='/sw_exporter/main/index?format=nt' title='NTriples'
+<fb:tab-item href='index?format=nt' title='NTriples'
 {{ if format == 'nt':}}
 selected='true'
 {{pass}}
 />
-<fb:tab-item href='/sw_exporter/main/index?format=turtle' title='Turtle'
+<fb:tab-item href='index?format=turtle' title='Turtle'
 {{ if format == 'turtle':}}
 selected='true'
 {{pass}}
