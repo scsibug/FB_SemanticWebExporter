@@ -23,7 +23,6 @@ foafp = "http://xmlns.com/foaf/0.1/"
 # request users email and foaf:Person URI
 # Allow users to show only their info, not their friends.
 # Direct links to triples, for saving.
-# Cache the latest X graphs for X seconds
 # Publish aggregate data about # of triples served, unique users, etc.
 
 def index():
@@ -33,6 +32,15 @@ def index():
     reqformat=request.vars.format
     if (reqformat != 'n3' and reqformat != 'rdf' and reqformat != 'nt' and reqformat != 'turtle'):
         reqformat = 'rdf'
+    graph = cache.ram(facebook.uid, lambda:buildgraph(facebook),time_expire=120)
+    graphserial = graph.serialize(format=reqformat)
+    tc = len(graph)
+    stop_time = time.time()
+    db.served_log.insert(fb_user_id=facebook.uid, triple_count=tc, format=reqformat, processing_ms=(stop_time-start_time)*1000.0, timestamp=datetime.datetime.now())
+    d = dict(message="Hello "+get_facebook_user(request), graph=graphserial, format=reqformat, count=tc)
+    return response.render(d)
+
+def buildgraph(facebook):
     # Create an in-memory store
     graph = Graph()
     # Setup prefixes
@@ -42,8 +50,7 @@ def index():
     me = URIRef("#me")
     graph.add((me, TYPE, URIRef(foafp+"Person")))
     # Fetch more information about "myself"
-    uid=facebook.uid
-    query = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid=%s" % uid
+    query = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid=%s" % facebook.uid
     results = facebook.fql.query(query)[0]
     first_name = results[u'first_name']
     last_name = results[u'last_name']
@@ -72,7 +79,7 @@ def index():
     graph.add((myaccount, URIRef(foafp+"accountProfilePage"), URIRef(results[u'profile_url'])))
     graph.add((myaccount, URIRef(foafp+"accountServiceHomepage"), URIRef("http://www.facebook.com/")))
     # Find all friends
-    friendquery = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid IN (SELECT uid2 FROM friend WHERE uid1 = %s)" % uid
+    friendquery = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid IN (SELECT uid2 FROM friend WHERE uid1 = %s)" % facebook.uid
     friendresults = facebook.fql.query(friendquery)
 
     for fresult in friendresults:
@@ -103,8 +110,4 @@ def index():
         graph.add((friendaccount, URIRef(foafp+"accountName"), Literal(fname)))
         graph.add((friendaccount, URIRef(foafp+"accountProfilePage"), URIRef(fresult[u'profile_url'])))
         graph.add((friendaccount, URIRef(foafp+"accountServiceHomepage"), URIRef("http://www.facebook.com/")))
-    graphserial = graph.serialize(format=reqformat)
-    tc = len(graph)
-    stop_time = time.time()
-    db.served_log.insert(fb_user_id=uid, triple_count=tc, format=reqformat, processing_ms=(stop_time-start_time)*1000.0, timestamp=datetime.datetime.now())
-    return dict(message="Hello "+get_facebook_user(request), graph=graphserial, format=reqformat, count=tc)
+    return graph
