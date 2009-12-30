@@ -1,0 +1,29 @@
+<fb:header>Semantic Web Exporter</fb:header>
+<p>Congratulations, {{=count}} triples have been found.</p>
+<fb:tabs>
+<fb:tab-item href='/sw_exporter/main/index?format=rdf' title='RDF/XML'
+{{ if format == 'rdf':}}
+selected='true'
+{{pass}}
+/>
+<fb:tab-item href='/sw_exporter/main/index?format=n3' title='N3' 
+{{ if format == 'n3':}}
+selected='true'
+{{pass}}
+/>
+<fb:tab-item href='/sw_exporter/main/index?format=nt' title='NTriples'
+{{ if format == 'nt':}}
+selected='true'
+{{pass}}
+/>
+<fb:tab-item href='/sw_exporter/main/index?format=turtle' title='Turtle'
+{{ if format == 'turtle':}}
+selected='true'
+{{pass}}
+/>
+</fb:tabs>
+
+<pre><code>{{=graph}}</code></pre>
+
+<hr />
+The W3C in no way sponsors or endorses this application.  To learn more about RDF, please visit <a href="http://www.w3.org/RDF/">http://www.w3.org/RDF/</a>.
