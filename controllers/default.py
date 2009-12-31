@@ -55,7 +55,7 @@ def generate_triples_link(uid, format, token):
 def triples():
     token = request.vars.token
     fb_uid = request.vars.uid
-    real_token = cache.ram("token"+fb_uid, lambda:"")
+    real_token = cache.ram("token"+fb_uid, lambda:(urandom(24).encode('hex')),time_expire=swe_settings.GRAPH_CACHE_SEC)
     reqformat = detect_requested_format()
     if (real_token == token):
         if reqformat not in ['rdf', 'n3', 'nt', 'turtle']:
