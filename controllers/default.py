@@ -21,6 +21,8 @@ foafp = "http://xmlns.com/foaf/0.1/"
 # request users email and foaf:Person URI
 # Allow users to show only their info, not their friends.
 # Publish aggregate data about # of triples served, unique users, etc.
+# Direct links are broken when running web2py multiprocess.
+#      Need to store tokens in DB, not cache.
 
 def index():
     require_facebook_login(request,fb_settings)
