@@ -10,3 +10,6 @@ swe_settings=Storage()
 # How long to cache (in memory) generated RDF graphs.
 # Must be less than 24 hours per Facebook TOS.
 swe_settings.GRAPH_CACHE_SEC=10
+# We have to send FQ URLs to give users pages outside of the facebook
+# canvas.  This is used for direct links to RDF.
+swe_settings.SERVER_APP_URL=http://hostname/sw_exporter/

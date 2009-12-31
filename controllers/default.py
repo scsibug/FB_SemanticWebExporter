@@ -13,33 +13,73 @@ from rdflib import BNode
 from rdflib import URIRef
 from rdflib.constants import TYPE, VALUE
 from rdflib.TripleStore import TripleStore
-
+from os import urandom
 foafp = "http://xmlns.com/foaf/0.1/"
 
 # TODO:
-# strip out spaces/newlines/&#10 from websites attribute (make separate website properties)
-# deal with websites that start with "www"
 # Generic functions to add triples from either friends or myself.
 # request users email and foaf:Person URI
 # Allow users to show only their info, not their friends.
-# Direct links to triples, for saving.
 # Publish aggregate data about # of triples served, unique users, etc.
 
 def index():
     require_facebook_login(request,fb_settings)
     start_time = time.time()
     facebook=request.facebook
-    reqformat=request.vars.format
-    if (reqformat != 'n3' and reqformat != 'rdf' and reqformat != 'nt' and reqformat != 'turtle'):
-        reqformat = 'rdf'
+    reqformat = detect_requested_format()
     graph = cache.ram(facebook.uid, lambda:buildgraph(facebook),time_expire=swe_settings.GRAPH_CACHE_SEC)
     graphserial = graph.serialize(format=reqformat)
     tc = len(graph)
+    # Generate a random token for the direct link
+    token = cache.ram("token"+facebook.uid, lambda:(urandom(24).encode('hex')),time_expire=swe_settings.GRAPH_CACHE_SEC)
+    tripleslink = generate_triples_link(facebook.uid, reqformat, token)
     stop_time = time.time()
     db.served_log.insert(fb_user_id=facebook.uid, triple_count=tc, format=reqformat, processing_ms=(stop_time-start_time)*1000.0, timestamp=datetime.datetime.now())
-    d = dict(message="Hello "+get_facebook_user(request), graph=graphserial, format=reqformat, count=tc)
-    return response.render(d)
+    return dict(message="Hello "+get_facebook_user(request), graph=graphserial, format=reqformat, count=tc, tripleslink=tripleslink, baseurl=swe_settings.CANVAS_BASE_URL)
 
+def detect_requested_format():
+    reqformat=request.vars.format
+    if (reqformat != 'n3' and reqformat != 'rdf' and reqformat != 'nt' and reqformat != 'turtle'):
+        reqformat = 'rdf'
+    return reqformat
+
+# Generate an absolute link to raw triples, for direct downloads.
+def generate_triples_link(uid, format, token):
+    if not format:
+        format = 'rdf'
+    if token and uid:
+        return swe_settings.SERVER_APP_URL + 'default/triples?' + 'token=' + token + '&uid=' + uid + '&format=' + format
+    else:
+        return ""
+
+def triples():
+    token = request.vars.token
+    fb_uid = request.vars.uid
+    real_token = cache.ram("token"+fb_uid, lambda:"")
+    reqformat = detect_requested_format()
+    if (real_token == token):
+        if reqformat not in ['rdf', 'n3', 'nt', 'turtle']:
+            reqformat = 'rdf'
+        # pull the graph out of the cache
+        graph = cache.ram(fb_uid, lambda:buildgraph())
+        graphserial = graph.serialize(format=reqformat)
+        if reqformat == 'rdf':
+            response.headers["Content-Type"] = "application/rdf+xml; charset=utf-8"
+            response.headers["Content-disposition"] = "attachment; filename=foaf.rdf"
+        elif reqformat == 'n3':
+            response.headers["Content-Type"] = "text/n3"
+            response.headers["Content-disposition"] = "attachment; filename=foaf.n3"
+        elif reqformat == 'nt': # N-Triples are ASCII
+            response.headers["Content-Type"] = "text/plain"
+            response.headers["Content-disposition"] = "attachment; filename=foaf.nt"
+        elif reqformat == 'turtle': # Turtle is UTF-8 always
+            response.headers["Content-Type"] = "application/x-turtle"
+            response.headers["Content-disposition"] = "attachment; filename=foaf.ttl"
+        return graphserial            
+
+    else:
+        return "Not authorized, or this link has expired."
+    
 # Take an RDF graph, foaf-user URI, and the facebook "website" field,
 # and try to extract some meaningful URIs.  People often put multiple
 # space/newline delimited websites in this field, and leave off the
@@ -61,6 +101,8 @@ def sanitize_websites(graph, user, website_field):
         # Text is too sketchy to try and url-ize.
 
 def buildgraph(facebook):
+    if not facebook:
+        return
     # Create an in-memory store
     graph = Graph()
     # Setup prefixes
