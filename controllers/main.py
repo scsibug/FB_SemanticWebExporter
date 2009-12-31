@@ -1,5 +1,5 @@
 from applications.sw_exporter.modules.facebook import *
-from applications.sw_exporter.settings import *
+from applications.sw_exporter.modules.settings import swe_settings, fb_settings
 
 import datetime
 import time
@@ -26,13 +26,13 @@ foafp = "http://xmlns.com/foaf/0.1/"
 # Publish aggregate data about # of triples served, unique users, etc.
 
 def index():
-    require_facebook_login(request,facebook_settings)
+    require_facebook_login(request,fb_settings)
     start_time = time.time()
     facebook=request.facebook
     reqformat=request.vars.format
     if (reqformat != 'n3' and reqformat != 'rdf' and reqformat != 'nt' and reqformat != 'turtle'):
         reqformat = 'rdf'
-    graph = cache.ram(facebook.uid, lambda:buildgraph(facebook),time_expire=120)
+    graph = cache.ram(facebook.uid, lambda:buildgraph(facebook),time_expire=swe_settings.GRAPH_CACHE_SEC)
     graphserial = graph.serialize(format=reqformat)
     tc = len(graph)
     stop_time = time.time()

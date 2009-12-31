@@ -1,0 +1,12 @@
+from gluon.storage import Storage
+fb_settings=Storage()
+fb_settings.FACEBOOK_API_KEY = 'xxx'
+fb_settings.FACEBOOK_SECRET_KEY = 'xxx'
+fb_settings.FACEBOOK_APP_NAME = "Semantic Web Exporter"
+fb_settings.FACEBOOK_INTERNAL = True
+fb_settings.FACEBOOK_CALLBACK_PATH = "/sw_exporter/main?"
+
+swe_settings=Storage()
+# How long to cache (in memory) generated RDF graphs.
+# Must be less than 24 hours per Facebook TOS.
+swe_settings.GRAPH_CACHE_SEC=10
