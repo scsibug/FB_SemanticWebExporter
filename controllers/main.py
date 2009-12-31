@@ -40,6 +40,26 @@ def index():
     d = dict(message="Hello "+get_facebook_user(request), graph=graphserial, format=reqformat, count=tc)
     return response.render(d)
 
+# Take an RDF graph, foaf-user URI, and the facebook "website" field,
+# and try to extract some meaningful URIs.  People often put multiple
+# space/newline delimited websites in this field, and leave off the
+# scheme (http://).
+def sanitize_websites(graph, user, website_field):
+    # get a list of whitespace-delimited items in the website field
+    websites = website_field.split()
+    # Assume all websites start with "http://"
+    for website in websites:
+        # Strip off trailing characters more likely to be used in a list of
+        # entries than to end a valid URL
+        website = website.rstrip(',;')
+        if website.startswith("http://") or website.startswith("https://"):
+            graph.add((user,URIRef(foafp+"homepage"),URIRef(website)))
+        elif website.startswith("www"):
+            graph.add((user,URIRef(foafp+"homepage"),URIRef("http://"+website)))
+        elif (".com" in website) or (".net" in website) or (".org" in website):
+            graph.add((user,URIRef(foafp+"homepage"),URIRef("http://"+website)))
+        # Text is too sketchy to try and url-ize.
+
 def buildgraph(facebook):
     # Create an in-memory store
     graph = Graph()
@@ -68,7 +88,7 @@ def buildgraph(facebook):
 
     website = results[u'website']
     if website :
-        graph.add((me, URIRef(foafp+"homepage"), URIRef(website)))
+        sanitize_websites(graph, me, website)
 
     # Build facebook account info
     # the "account" is blank
@@ -103,7 +123,7 @@ def buildgraph(facebook):
 
         fwebsite = fresult[u'website']
         if fwebsite :
-            graph.add((thisfriend, URIRef(foafp+"homepage"), URIRef(fwebsite)))
+            sanitize_websites(graph, thisfriend, fwebsite)
         friendaccount = BNode()
         graph.add((thisfriend, URIRef(foafp+"account"), friendaccount))
         graph.add((friendaccount, TYPE, URIRef(foafp+"OnlineAccount")))
