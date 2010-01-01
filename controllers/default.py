@@ -94,7 +94,10 @@ def triples():
         return "Not authorized, or this link has expired."
     reqformat = detect_requested_format()
     fbgraph = FacebookGraph(facebook)
-    fbgraph.generateThisUsersTriples(user_uri=foaf_person)
+    if foaf_person:
+        fbgraph.generateThisUsersTriples(user_uri=URIRef(foaf_person))
+    else:
+        fbgraph.generateThisUsersTriples()
     fbgraph.generateFriendTriples()
     graph = fbgraph.graph
     tc = len(graph)
