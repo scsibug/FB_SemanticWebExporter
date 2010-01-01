@@ -51,7 +51,6 @@ def index():
     # to make sure it has the correct values.
     facebook.swe_token = cache.ram(token_cache_prefix+facebook.uid, lambda:urandom(24).encode('hex'),time_expire=0)
     cached_fb = cache.ram(fb_cache_prefix+facebook.uid, lambda:facebook,time_expire=0)
-    response.write("cached fb key is "+cached_fb.swe_token)
     tripleslink = generate_triples_link(facebook.uid, reqformat, facebook.swe_token)
     stop_time = time.time()
     db.served_log.insert(fb_user_id=facebook.uid, triple_count=tc, format=reqformat, processing_ms=(stop_time-start_time)*1000.0, timestamp=datetime.datetime.now())
