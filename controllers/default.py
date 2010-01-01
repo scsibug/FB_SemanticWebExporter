@@ -75,6 +75,7 @@ def generate_triples_link(uid, format, token):
 # use params to determine what type of graph to build, and what format to provide it in.
 # send graph data to user.
 def triples():
+    start_time = time.time()
     provided_token = request.vars.swe_token
     fb_uid = request.vars.uid
     facebook = cache.ram(fb_cache_prefix+fb_uid, lambda:None)
@@ -98,6 +99,7 @@ def triples():
     fbgraph.generateThisUsersTriples()
     fbgraph.generateFriendTriples()
     graph = fbgraph.graph
+    tc = len(graph)
     graphserial = graph.serialize(format=reqformat)
     if reqformat not in ['rdf', 'n3', 'nt', 'turtle']:
         reqformat = 'rdf'
@@ -113,6 +115,8 @@ def triples():
     elif reqformat == 'turtle': # Turtle is UTF-8 always
         response.headers["Content-Type"] = "application/x-turtle"
         response.headers["Content-disposition"] = "attachment; filename=foaf.ttl"
+    stop_time = time.time()
+    db.served_log.insert(fb_user_id=fb_uid, triple_count=tc, format=reqformat, processing_ms=(stop_time-start_time)*1000.0, timestamp=datetime.datetime.now())
     return graphserial
 
 
