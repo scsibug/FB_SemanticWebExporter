@@ -143,8 +143,6 @@ def extract_homepages(website_field):
         return homepages
     # get a list of whitespace-delimited items in the website field
     websites = website_field.split()
-
-    # Assume all websites start with "http://"
     for website in websites:
         # Strip off trailing characters more likely to be used in a list of
         # entries than to end a valid URL
@@ -250,6 +248,7 @@ class FacebookGraph:
                                  URIRef(foafp+"familyName"),
                                  sr[u'last_name'])
         if sr[u'first_name'] and sr[u'last_name']:
+            name = sr[u'first_name']+" "+sr[u'last_name']
             self.attemptAddAsLiteral(self.me,
                                      URIRef(foafp+"name"),
                                      sr[u'first_name']+" "+sr[u'last_name'])
@@ -258,6 +257,16 @@ class FacebookGraph:
         sites = extract_homepages(sr[u'website'])
         for site in sites:
             self.attemptAddAsURI(self.me, URIRef(foafp+"homepage"), site)
+        self.generateAccountProfile(self.me, name, sr[u'profile_url'])
+
+    def generateAccountProfile(self,personRef,name,profile_url):
+        """Add fb account info for the foaf:person using their name and profile url."""
+        account = BNode()
+        self.graph.add((personRef, URIRef(foafp+"account"), account))
+        self.attemptAddAsURI(account, TYPE, foafp+"OnlineAccount")
+        self.attemptAddAsLiteral(account, URIRef(foafp+"accountName"), name)
+        self.attemptAddAsURI(account, URIRef(foafp+"accountProfilePage"), profile_url)
+        self.attemptAddAsURI(account, URIRef(foafp+"accountServiceHomepage"), "http://www.facebook.com/")
 
     def attemptAddAsLiteral(self, subj, pred, string):
         """Add a triple, if the literal string is defined."""
