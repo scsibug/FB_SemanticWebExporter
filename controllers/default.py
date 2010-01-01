@@ -46,7 +46,7 @@ def index():
     # put a token into the facebook object, to use for authorization
     # for out-of-band (non-facebook) requests, we can authenticate people by making sure they provide
     # this token in their request.
-    facebook.swe_token = cache.ram(token_cache_prefix, lambda:urandom(24).encode('hex'))
+    facebook.swe_token = cache.ram(token_cache_prefix+facebook.uid, lambda:urandom(24).encode('hex'))
     # cache the facebook session after the token has been inserted
     cache.ram(fb_cache_prefix+facebook.uid, lambda:facebook)
     # Generate a random token for the direct link...
@@ -90,10 +90,7 @@ def triples():
     elif not correct_token:
         return "Could not get the correct token from the facebook session."
     elif (correct_token != provided_token):
-        return "Not authorized, or this link has expired.  "+"correct: "+correct_token+" you provided: "+provided_token
-    #else:
-    #    return "Welcome "+facebook.uid+", you are authorized."
-    #real_token = cache.ram("token"+fb_uid, lambda:(urandom(24).encode('hex')),time_expire=swe_settings.GRAPH_CACHE_SEC)
+        return "Not authorized, or this link has expired."
     reqformat = detect_requested_format()
     fbgraph = FacebookGraph(facebook)
     fbgraph.generateThisUsersTriples()
