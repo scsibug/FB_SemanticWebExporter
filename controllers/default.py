@@ -16,25 +16,42 @@ from rdflib.TripleStore import TripleStore
 from os import urandom
 foafp = "http://xmlns.com/foaf/0.1/"
 
+# prefix for saving facebook sessions: append uid, lookup, and get facebook session.
+fb_cache_prefix="facebook-"
+# prefix  for saving auth tokens: append uid, lookup, and get secret key
+token_cache_prefix="swe_token-"
+
 # TODO:
+# Don't display triples directly, after ~3000, facebook times out in displaying the page
 # Generic functions to add triples from either friends or myself.
 # request users email and foaf:Person URI
 # Allow users to show only their info, not their friends.
 # Publish aggregate data about # of triples served, unique users, etc.
 # Direct links are broken when running web2py multiprocess.
 #      Need to store tokens in DB, not cache.
+# Personal profile document tags, creation date, etc.
 
 def index():
     require_facebook_login(request,fb_settings)
     start_time = time.time()
     facebook=request.facebook
     reqformat = detect_requested_format()
-    graph = cache.ram(facebook.uid, lambda:buildgraph(facebook),time_expire=swe_settings.GRAPH_CACHE_SEC)
+    fbgraph = FacebookGraph(facebook)
+    fbgraph.generateThisUsersTriples()
+    graph = fbgraph.graph
+    #graph = cache.ram(facebook.uid, lambda:graph,time_expire=swe_settings.GRAPH_CACHE_SEC)
     graphserial = graph.serialize(format=reqformat)
     tc = len(graph)
-    # Generate a random token for the direct link
-    token = cache.ram("token"+facebook.uid, lambda:(urandom(24).encode('hex')),time_expire=swe_settings.GRAPH_CACHE_SEC)
-    tripleslink = generate_triples_link(facebook.uid, reqformat, token)
+    # put a token into the facebook object, to use for authorization
+    # for out-of-band (non-facebook) requests, we can authenticate people by making sure they provide
+    # this token in their request.
+    facebook.swe_token = cache.ram(token_cache_prefix, lambda:urandom(24).encode('hex'))
+    # cache the facebook session after the token has been inserted
+    cache.ram(fb_cache_prefix+facebook.uid, lambda:facebook)
+    response.write("token is " + facebook.swe_token)
+    # Generate a random token for the direct link...
+    #token = cache.ram("token"+facebook.uid, lambda:facebook.swe_auth_token,time_expire=swe_settings.GRAPH_CACHE_SEC)
+    tripleslink = generate_triples_link(facebook.uid, reqformat, facebook.swe_token)
     stop_time = time.time()
     db.served_log.insert(fb_user_id=facebook.uid, triple_count=tc, format=reqformat, processing_ms=(stop_time-start_time)*1000.0, timestamp=datetime.datetime.now())
     return dict(message="Hello "+get_facebook_user(request), graph=graphserial, format=reqformat, count=tc, tripleslink=tripleslink, baseurl=swe_settings.CANVAS_BASE_URL)
@@ -50,38 +67,54 @@ def generate_triples_link(uid, format, token):
     if not format:
         format = 'rdf'
     if token and uid:
-        return swe_settings.SERVER_APP_URL + 'default/triples?' + 'token=' + token + '&uid=' + uid + '&format=' + format
+        return swe_settings.SERVER_APP_URL + 'default/triples?' + 'swe_token=' + token + '&uid=' + uid + '&format=' + format
     else:
         return ""
 
+# use cache lookup and provided authz token, to retrieve a facebook object.
+# use params to determine what type of graph to build, and what format to provide it in.
+# send graph data to user.
 def triples():
-    token = request.vars.token
+    provided_token = request.vars.swe_token
     fb_uid = request.vars.uid
-    real_token = cache.ram("token"+fb_uid, lambda:(urandom(24).encode('hex')),time_expire=swe_settings.GRAPH_CACHE_SEC)
+    facebook = cache.ram(fb_cache_prefix+fb_uid, lambda:None)
+    # Don't allow the link to be reused.
+    cache.ram.clear(regex=fb_cache_prefix+fb_uid)
+    if (not facebook):
+        # Should redirect back to facebook app?
+        return "This link has expired, please try generating a new link from Facebook."
+    correct_token = facebook.swe_token
+    if not provided_token:
+        return "Provided token is null"
+    elif not correct_token:
+        return "Could not get the correct token from the facebook session."
+    elif (correct_token != provided_token):
+        return "Not authorized, or this link has expired.  "+"correct: "+correct_token+" you provided: "+provided_token
+    #else:
+    #    return "Welcome "+facebook.uid+", you are authorized."
+    #real_token = cache.ram("token"+fb_uid, lambda:(urandom(24).encode('hex')),time_expire=swe_settings.GRAPH_CACHE_SEC)
     reqformat = detect_requested_format()
-    if (real_token == token):
-        if reqformat not in ['rdf', 'n3', 'nt', 'turtle']:
-            reqformat = 'rdf'
-        # pull the graph out of the cache
-        graph = cache.ram(fb_uid, lambda:buildgraph())
-        graphserial = graph.serialize(format=reqformat)
-        if reqformat == 'rdf':
-            response.headers["Content-Type"] = "application/rdf+xml; charset=utf-8"
-            response.headers["Content-disposition"] = "attachment; filename=foaf.rdf"
-        elif reqformat == 'n3':
-            response.headers["Content-Type"] = "text/n3"
-            response.headers["Content-disposition"] = "attachment; filename=foaf.n3"
-        elif reqformat == 'nt': # N-Triples are ASCII
-            response.headers["Content-Type"] = "text/plain"
-            response.headers["Content-disposition"] = "attachment; filename=foaf.nt"
-        elif reqformat == 'turtle': # Turtle is UTF-8 always
-            response.headers["Content-Type"] = "application/x-turtle"
-            response.headers["Content-disposition"] = "attachment; filename=foaf.ttl"
-        return graphserial            
+    fbgraph = FacebookGraph(facebook)
+    fbgraph.generateThisUsersTriples()
+    graph = fbgraph.graph
+    graphserial = graph.serialize(format=reqformat)
+    if reqformat not in ['rdf', 'n3', 'nt', 'turtle']:
+        reqformat = 'rdf'
+    if reqformat == 'rdf':
+        response.headers["Content-Type"] = "application/rdf+xml; charset=utf-8"
+        response.headers["Content-disposition"] = "attachment; filename=foaf.rdf"
+    elif reqformat == 'n3':
+        response.headers["Content-Type"] = "text/n3"
+        response.headers["Content-disposition"] = "attachment; filename=foaf.n3"
+    elif reqformat == 'nt': # N-Triples are ASCII
+        response.headers["Content-Type"] = "text/plain"
+        response.headers["Content-disposition"] = "attachment; filename=foaf.nt"
+    elif reqformat == 'turtle': # Turtle is UTF-8 always
+        response.headers["Content-Type"] = "application/x-turtle"
+        response.headers["Content-disposition"] = "attachment; filename=foaf.ttl"
+    return graphserial
 
-    else:
-        return "Not authorized, or this link has expired."
-    
+
 # Take an RDF graph, foaf-user URI, and the facebook "website" field,
 # and try to extract some meaningful URIs.  People often put multiple
 # space/newline delimited websites in this field, and leave off the
@@ -102,6 +135,27 @@ def sanitize_websites(graph, user, website_field):
             graph.add((user,URIRef(foafp+"homepage"),URIRef("http://"+website)))
         # Text is too sketchy to try and url-ize.
 
+# Take a facebook "website" string, and extract a list of URIs (string
+# type) that can be assigned as foaf:homepages.
+def extract_homepages(website_field):
+    homepages = []
+    if not website_field:
+        return homepages
+    # get a list of whitespace-delimited items in the website field
+    websites = website_field.split()
+
+    # Assume all websites start with "http://"
+    for website in websites:
+        # Strip off trailing characters more likely to be used in a list of
+        # entries than to end a valid URL
+        website = website.rstrip(',;')
+        if website.startswith("http://") or website.startswith("https://"):
+            homepages.append(website)
+        elif website.startswith("www") or (".com" in website) or (".net" in website) or (".org" in website):
+            homepages.append("http://"+website)
+        # Else, website is too sketchy to try and url-ize.
+    return homepages
+
 def buildgraph(facebook):
     if not facebook:
         return
@@ -110,7 +164,6 @@ def buildgraph(facebook):
     # Setup prefixes
     graph.bind("foaf", foafp)
     # Add a relative URIRef to "myself"
-    # TODO: give the option to provide an absolute URI
     me = URIRef("#me")
     graph.add((me, TYPE, URIRef(foafp+"Person")))
     # Fetch more information about "myself"
@@ -175,3 +228,51 @@ def buildgraph(facebook):
         graph.add((friendaccount, URIRef(foafp+"accountProfilePage"), URIRef(fresult[u'profile_url'])))
         graph.add((friendaccount, URIRef(foafp+"accountServiceHomepage"), URIRef("http://www.facebook.com/")))
     return graph
+
+class FacebookGraph:
+    """RDF graph for facebook data."""
+    def __init__(self, facebook):
+        self.facebook = facebook
+        self.graph = Graph()
+        # Setup prefixes
+        self.graph.bind("foaf", foafp)
+
+
+    def generateThisUsersTriples(self):
+        """Generate triples for the facebook user."""
+        self.me = URIRef("#me")
+        self.graph.add((self.me, TYPE, URIRef(foafp+"Person")))
+        sr = self._userSearchResults(self.facebook.uid)
+        self.attemptAddAsLiteral(self.me,
+                                 URIRef(foafp+"givenName"),
+                                 sr[u'first_name'])
+        self.attemptAddAsLiteral(self.me,
+                                 URIRef(foafp+"familyName"),
+                                 sr[u'last_name'])
+        if sr[u'first_name'] and sr[u'last_name']:
+            self.attemptAddAsLiteral(self.me,
+                                     URIRef(foafp+"name"),
+                                     sr[u'first_name']+" "+sr[u'last_name'])
+        self.attemptAddAsLiteral(self.me,URIRef(foafp+"gender"),sr[u'sex'])
+        self.attemptAddAsURI(self.me, URIRef(foafp+"img"), sr[u'pic'])
+        sites = extract_homepages(sr[u'website'])
+        for site in sites:
+            self.attemptAddAsURI(self.me, URIRef(foafp+"homepage"), site)
+
+    def attemptAddAsLiteral(self, subj, pred, string):
+        """Add a triple, if the literal string is defined."""
+        if string:
+            self.graph.add((subj,pred,Literal(string)))
+
+    def attemptAddAsURI(self, subj, pred, uri):
+        """Add a triple, if the URI is defined."""
+        if uri:
+            self.graph.add((subj,pred,URIRef(uri)))
+
+    def generateFriendTriples(self):
+        """Generate triples for friends of this user."""
+
+    def _userSearchResults(self, uid):
+        """Return search results for a given user"""
+        query = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid=%s" % uid
+        return self.facebook.fql.query(query)[0]
