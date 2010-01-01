@@ -38,6 +38,7 @@ def index():
     reqformat = detect_requested_format()
     fbgraph = FacebookGraph(facebook)
     fbgraph.generateThisUsersTriples()
+    fbgraph.generateFriendTriples(limit=2)
     graph = fbgraph.graph
     #graph = cache.ram(facebook.uid, lambda:graph,time_expire=swe_settings.GRAPH_CACHE_SEC)
     graphserial = graph.serialize(format=reqformat)
@@ -96,6 +97,7 @@ def triples():
     reqformat = detect_requested_format()
     fbgraph = FacebookGraph(facebook)
     fbgraph.generateThisUsersTriples()
+    fbgraph.generateFriendTriples()
     graph = fbgraph.graph
     graphserial = graph.serialize(format=reqformat)
     if reqformat not in ['rdf', 'n3', 'nt', 'turtle']:
@@ -154,79 +156,6 @@ def extract_homepages(website_field):
         # Else, website is too sketchy to try and url-ize.
     return homepages
 
-def buildgraph(facebook):
-    if not facebook:
-        return
-    # Create an in-memory store
-    graph = Graph()
-    # Setup prefixes
-    graph.bind("foaf", foafp)
-    # Add a relative URIRef to "myself"
-    me = URIRef("#me")
-    graph.add((me, TYPE, URIRef(foafp+"Person")))
-    # Fetch more information about "myself"
-    query = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid=%s" % facebook.uid
-    results = facebook.fql.query(query)[0]
-    first_name = results[u'first_name']
-    last_name = results[u'last_name']
-    name = first_name+' '+last_name
-    graph.add((me, URIRef(foafp+"givenName"), Literal(first_name)))
-    graph.add((me, URIRef(foafp+"familyName"), Literal(last_name)))
-    graph.add((me, URIRef(foafp+"name"), Literal(name)))
-    sex = results[u'sex']
-    if sex :
-        graph.add((me, URIRef(foafp+"gender"), Literal(sex)))
-
-    pic = results[u'pic']
-    if pic :
-        graph.add((me, URIRef(foafp+"img"), URIRef(pic)))
-
-    website = results[u'website']
-    if website :
-        sanitize_websites(graph, me, website)
-
-    # Build facebook account info
-    # the "account" is blank
-    myaccount = BNode()
-    graph.add((me, URIRef(foafp+"account"), myaccount))
-    graph.add((myaccount, TYPE, URIRef(foafp+"OnlineAccount")))
-    graph.add((myaccount, URIRef(foafp+"accountName"), Literal(name)))
-    graph.add((myaccount, URIRef(foafp+"accountProfilePage"), URIRef(results[u'profile_url'])))
-    graph.add((myaccount, URIRef(foafp+"accountServiceHomepage"), URIRef("http://www.facebook.com/")))
-    # Find all friends
-    friendquery = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid IN (SELECT uid2 FROM friend WHERE uid1 = %s)" % facebook.uid
-    friendresults = facebook.fql.query(friendquery)
-
-    for fresult in friendresults:
-        thisfriend = BNode()
-        graph.add((myaccount, URIRef(foafp+"knows"), thisfriend))
-        ffirst_name = fresult[u'first_name']
-        flast_name = fresult[u'last_name']
-        fname = ffirst_name+' '+flast_name
-        fsex = fresult[u'sex']
-        if ffirst_name:
-            graph.add((thisfriend, URIRef(foafp+"givenName"), Literal(ffirst_name)))
-        if flast_name:
-            graph.add((thisfriend, URIRef(foafp+"familyName"), Literal(flast_name)))
-        if fname:
-            graph.add((thisfriend, URIRef(foafp+"name"), Literal(fname)))
-        if fsex:
-            graph.add((thisfriend, URIRef(foafp+"gender"), Literal(fsex)))
-        fpic = fresult[u'pic']
-        if fpic :
-            graph.add((thisfriend, URIRef(foafp+"img"), URIRef(fpic)))
-
-        fwebsite = fresult[u'website']
-        if fwebsite :
-            sanitize_websites(graph, thisfriend, fwebsite)
-        friendaccount = BNode()
-        graph.add((thisfriend, URIRef(foafp+"account"), friendaccount))
-        graph.add((friendaccount, TYPE, URIRef(foafp+"OnlineAccount")))
-        graph.add((friendaccount, URIRef(foafp+"accountName"), Literal(fname)))
-        graph.add((friendaccount, URIRef(foafp+"accountProfilePage"), URIRef(fresult[u'profile_url'])))
-        graph.add((friendaccount, URIRef(foafp+"accountServiceHomepage"), URIRef("http://www.facebook.com/")))
-    return graph
-
 class FacebookGraph:
     """RDF graph for facebook data."""
     def __init__(self, facebook):
@@ -235,29 +164,12 @@ class FacebookGraph:
         # Setup prefixes
         self.graph.bind("foaf", foafp)
 
-
     def generateThisUsersTriples(self):
         """Generate triples for the facebook user."""
         self.me = URIRef("#me")
         self.graph.add((self.me, TYPE, URIRef(foafp+"Person")))
         sr = self._userSearchResults(self.facebook.uid)
-        self.attemptAddAsLiteral(self.me,
-                                 URIRef(foafp+"givenName"),
-                                 sr[u'first_name'])
-        self.attemptAddAsLiteral(self.me,
-                                 URIRef(foafp+"familyName"),
-                                 sr[u'last_name'])
-        if sr[u'first_name'] and sr[u'last_name']:
-            name = sr[u'first_name']+" "+sr[u'last_name']
-            self.attemptAddAsLiteral(self.me,
-                                     URIRef(foafp+"name"),
-                                     sr[u'first_name']+" "+sr[u'last_name'])
-        self.attemptAddAsLiteral(self.me,URIRef(foafp+"gender"),sr[u'sex'])
-        self.attemptAddAsURI(self.me, URIRef(foafp+"img"), sr[u'pic'])
-        sites = extract_homepages(sr[u'website'])
-        for site in sites:
-            self.attemptAddAsURI(self.me, URIRef(foafp+"homepage"), site)
-        self.generateAccountProfile(self.me, name, sr[u'profile_url'])
+        self._generateUsersTriples(self.me,sr)
 
     def generateAccountProfile(self,personRef,name,profile_url):
         """Add fb account info for the foaf:person using their name and profile url."""
@@ -268,6 +180,41 @@ class FacebookGraph:
         self.attemptAddAsURI(account, URIRef(foafp+"accountProfilePage"), profile_url)
         self.attemptAddAsURI(account, URIRef(foafp+"accountServiceHomepage"), "http://www.facebook.com/")
 
+    def _generateUsersTriples(self,personURI,sr):
+        self.attemptAddAsLiteral(personURI,
+                                 URIRef(foafp+"givenName"),
+                                 sr[u'first_name'])
+        self.attemptAddAsLiteral(personURI,
+                                 URIRef(foafp+"familyName"),
+                                 sr[u'last_name'])
+        if sr[u'first_name'] and sr[u'last_name']:
+            name = sr[u'first_name']+" "+sr[u'last_name']
+            self.attemptAddAsLiteral(personURI,
+                                     URIRef(foafp+"name"),
+                                     sr[u'first_name']+" "+sr[u'last_name'])
+        self.attemptAddAsLiteral(personURI,URIRef(foafp+"gender"),sr[u'sex'])
+        self.attemptAddAsURI(personURI, URIRef(foafp+"img"), sr[u'pic'])
+        sites = extract_homepages(sr[u'website'])
+        for site in sites:
+            self.attemptAddAsURI(personURI, URIRef(foafp+"homepage"), site)
+        self.generateAccountProfile(personURI, name, sr[u'profile_url'])
+
+    def generateFriendTriples(self,limit=None):
+        """Add all friend entries.  Optional limit on friends added."""
+        if limit:
+            limit_stmt = " LIMIT "+str(limit)
+        else:
+            limit_stmt = ""
+        # query for all friends
+        friendquery = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid IN (SELECT uid2 FROM friend WHERE uid1 = %s) %s" % (self.facebook.uid, limit_stmt)
+        friendresults = self.facebook.fql.query(friendquery)
+        for fresult in friendresults:
+            thisfriend = BNode()
+            self._generateUsersTriples(thisfriend,fresult)
+
+    def addFriend(self,personRef):
+        self.attemptAddAsURI(self.me, URIRef(foafp+"knows"), personRef)
+
     def attemptAddAsLiteral(self, subj, pred, string):
         """Add a triple, if the literal string is defined."""
         if string:
@@ -277,9 +224,6 @@ class FacebookGraph:
         """Add a triple, if the URI is defined."""
         if uri:
             self.graph.add((subj,pred,URIRef(uri)))
-
-    def generateFriendTriples(self):
-        """Generate triples for friends of this user."""
 
     def _userSearchResults(self, uid):
         """Return search results for a given user"""
