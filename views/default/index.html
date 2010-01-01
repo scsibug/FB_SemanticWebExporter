@@ -1,6 +1,22 @@
 <fb:header>Semantic Web Exporter</fb:header>
-<p>Congratulations, {{=count}} triples have been created.</p>
-<p><a href="{{=tripleslink}}">Temporary link</a> for current format.</p>
+<h2>Introduction</h2>
+<p>
+This application exports machine-readable information about your
+facebook profile and friends, in an open format (RDF), described using
+the Friend of a Friend (FOAF) vocabulary.
+</p>
+<h2>Instructions</h2>
+<ol>
+<li>Use the tabs below to select a preferred serialization.  RDF/XML
+is the most common, but others are easier to edit manually if you want
+to make changes.</li>
+<li>Use the download link to save the full export file.  Only a couple of friends are included in the preview below, the download includes all friends.</li>
+<li>Upload the saved file to your website.</li>
+<li>Provide a link on your blog to the file, like so (assuming RDF/XML serialization): 
+<ul><li><code>&lt;link rel="meta" type="application/rdf+xml" title="FOAF" href="foaf.rdf" /&gt;</code></li></ul></li>
+</ol>
+
+<p><a href="{{=tripleslink}}">Temporary Download</a> for currently selected format.</p>
 <fb:tabs>
 <fb:tab-item href='{{=(baseurl+'default/index?format=rdf')}}' title='RDF/XML'
 {{ if format == 'rdf':}}
