@@ -49,7 +49,6 @@ def index():
     facebook.swe_token = cache.ram(token_cache_prefix, lambda:urandom(24).encode('hex'))
     # cache the facebook session after the token has been inserted
     cache.ram(fb_cache_prefix+facebook.uid, lambda:facebook)
-    response.write("token is " + facebook.swe_token)
     # Generate a random token for the direct link...
     #token = cache.ram("token"+facebook.uid, lambda:facebook.swe_auth_token,time_expire=swe_settings.GRAPH_CACHE_SEC)
     tripleslink = generate_triples_link(facebook.uid, reqformat, facebook.swe_token)
