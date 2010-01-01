@@ -78,6 +78,7 @@ def triples():
     start_time = time.time()
     provided_token = request.vars.swe_token
     fb_uid = request.vars.uid
+    foaf_person = request.vars.foaf_person
     facebook = cache.ram(fb_cache_prefix+fb_uid, lambda:None)
     # Don't allow the link to be reused.
     cache.ram.clear(regex=fb_cache_prefix+fb_uid)
@@ -93,7 +94,7 @@ def triples():
         return "Not authorized, or this link has expired."
     reqformat = detect_requested_format()
     fbgraph = FacebookGraph(facebook)
-    fbgraph.generateThisUsersTriples()
+    fbgraph.generateThisUsersTriples(user_uri=foaf_person)
     fbgraph.generateFriendTriples()
     graph = fbgraph.graph
     tc = len(graph)
@@ -164,9 +165,12 @@ class FacebookGraph:
         # Setup prefixes
         self.graph.bind("foaf", foafp)
 
-    def generateThisUsersTriples(self):
+    def generateThisUsersTriples(self,user_uri=None):
         """Generate triples for the facebook user."""
-        self.me = URIRef("#me")
+        if user_uri:
+            self.me = user_uri
+        else:
+            self.me = URIRef("#me")
         self.graph.add((self.me, TYPE, URIRef(foafp+"Person")))
         sr = self._userSearchResults(self.facebook.uid)
         self._generateUsersTriples(self.me,sr)
