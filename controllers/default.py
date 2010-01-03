@@ -53,8 +53,19 @@ def index():
     cached_fb = cache.ram(fb_cache_prefix+facebook.uid, lambda:facebook,time_expire=0)
     tripleslink = generate_triples_link(facebook.uid, reqformat, facebook.swe_token)
     stop_time = time.time()
-    db.served_log.insert(fb_user_id=facebook.uid, triple_count=tc, format=reqformat, processing_ms=(stop_time-start_time)*1000.0, timestamp=datetime.datetime.now())
-    return dict(message="Hello "+get_facebook_user(request), graph=graphserial, format=reqformat, count=tc, tripleslink=tripleslink, baseurl=swe_settings.CANVAS_BASE_URL)
+    db.served_log.insert(fb_user_id=facebook.uid,
+                         triple_count=tc,
+                         format=reqformat,
+                         processing_ms=(stop_time-start_time)*1000.0,
+                         timestamp=datetime.datetime.now())
+    return dict(message="Hello "+get_facebook_user(request),
+                graph=graphserial,
+                format=reqformat,
+                uid=facebook.uid,
+                swe_token=facebook.swe_token,
+                triplesbase=swe_settings.SERVER_APP_URL+'default/triples',
+                tripleslink=tripleslink,
+                baseurl=swe_settings.CANVAS_BASE_URL)
 
 def detect_requested_format():
     reqformat=request.vars.format
@@ -76,9 +87,10 @@ def generate_triples_link(uid, format, token):
 # send graph data to user.
 def triples():
     start_time = time.time()
-    provided_token = request.vars.swe_token
-    fb_uid = request.vars.uid
-    foaf_person = request.vars.foaf_person
+    provided_token = request.vars.swe_token # secret token from user
+    fb_uid = request.vars.uid # users facebook UID
+    foaf_person = request.vars.foaf_person # foaf person URI
+    include_friends = request.vars.include_friends # 'true' or 'false'
     facebook = cache.ram(fb_cache_prefix+fb_uid, lambda:None)
     # Don't allow the link to be reused.
     cache.ram.clear(regex=fb_cache_prefix+fb_uid)
@@ -98,7 +110,8 @@ def triples():
         fbgraph.generateThisUsersTriples(user_uri=URIRef(foaf_person))
     else:
         fbgraph.generateThisUsersTriples()
-    fbgraph.generateFriendTriples()
+    if include_friends and include_friends == 'true':
+        fbgraph.generateFriendTriples()
     graph = fbgraph.graph
     tc = len(graph)
     graphserial = graph.serialize(format=reqformat)
@@ -218,6 +231,7 @@ class FacebookGraph:
         for fresult in friendresults:
             thisfriend = BNode()
             self._generateUsersTriples(thisfriend,fresult)
+            self.addFriend(thisfriend)
 
     def addFriend(self,personRef):
         self.attemptAddAsURI(self.me, URIRef(foafp+"knows"), personRef)

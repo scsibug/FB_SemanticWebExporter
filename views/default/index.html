@@ -5,18 +5,66 @@ This application exports machine-readable information about your
 facebook profile and friends, in an open format (RDF), described using
 the Friend of a Friend (FOAF) vocabulary.
 </p>
+<p>
+Why would you want to do this?  See <a href="http://dig.csail.mit.edu/2008/Papers/MSNWS/">The Future of Online Social Networking</a>.
+</p>
 <h2>Instructions</h2>
 <ol>
-<li>Use the tabs below to select a preferred serialization.  RDF/XML
-is the most common, but others are easier to edit manually if you want
-to make changes.</li>
-<li>Use the download link to save the full export file.  Only a couple of friends are included in the preview below, the download includes all friends.</li>
+<li>If you have a "foaf:Person" URI for yourself already, it can be
+reused.  If not, don't worry, and leave the first field blank.</li>
+<li>Decide whether you want to export information about just yourself, or include friends as well.</il>
+<li>Select a preferred serialization format.  RDF/XML is the most
+common, but others are easier to edit manually if you want to make
+changes.</li>
+<li>Use the download link to save the export file.</li>
 <li>Upload the saved file to your website.</li>
 <li>Provide a link on your blog to the file, like so (assuming RDF/XML serialization): 
 <ul><li><code>&lt;link rel="meta" type="application/rdf+xml" title="FOAF" href="foaf.rdf" /&gt;</code></li></ul></li>
 </ol>
-
-<p><a href="{{=tripleslink}}">Temporary Download</a> for currently selected format.</p>
+<!--
+<fb:editor action="?do-it" labelwidth="100">
+     <fb:editor-text label="Title" name="title" value=""/>
+     <fb:editor-text label="Author" name="author" value=""/>
+     <fb:editor-custom label="Status">
+          <select name="state">
+               <option value="0" selected>have read</option>
+               <option value="1">am reading</option>
+               <option value="2">want to read</option>
+          </select>
+     </fb:editor-custom>
+     <fb:editor-textarea label="Comment" name="comment"/>
+     <fb:editor-buttonset>
+          <fb:editor-button value="Add"/>
+          <fb:editor-button value="Recommend"/>
+          <fb:editor-cancel />
+     </fb:editor-buttonset>
+</fb:editor>
+-->
+<!--<form name="swe" action="{{=triplesbase}}" method="get">-->
+<fb:editor action="{{=triplesbase}}" labelwidth="200">
+<input type="hidden" name="uid" value="{{=uid}}" />
+<input type="hidden" name="swe_token" value="{{=swe_token}}" />
+<fb:editor-text label="FOAF Person URI (optional)" name="foaf_person" placeholder="this is optional" />
+<fb:editor-custom label="Include Friends">
+<select name="include_friends">
+<option value="true" selected>Yes</option>
+<option value="false">No</option>
+</select>
+</fb:editor-custom>
+<fb:editor-custom label="Format">
+<select name="format">
+<option value="rdf" selected>RDF/XML</option>
+<option value="n3">N3</option>
+<option value="nt">NTriples</option>
+<option value="turtle">Turtle</option>
+</select>
+</fb:editor-custom>
+<fb:editor-buttonset>
+<fb:editor-button value="Download" name="submit" />
+</fb:editor-buttonset>
+</fb:editor>
+<!--<p><a href="{{=tripleslink}}">Temporary Download</a> for currently selected format.</p>-->
+<!--
 <fb:tabs>
 <fb:tab-item href='{{=(baseurl+'default/index?format=rdf')}}' title='RDF/XML'
 {{ if format == 'rdf':}}
@@ -41,6 +89,6 @@ selected='true'
 </fb:tabs>
 
 <pre><code>{{=graph}}</code></pre>
-
+-->
 <hr />
 The W3C in no way sponsors or endorses this application.  To learn more about RDF, please visit <a href="http://www.w3.org/RDF/">http://www.w3.org/RDF/</a>.
