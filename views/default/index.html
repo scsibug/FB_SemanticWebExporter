@@ -21,25 +21,7 @@ changes.</li>
 <li>Provide a link on your blog to the file, like so (assuming RDF/XML serialization): 
 <ul><li><code>&lt;link rel="meta" type="application/rdf+xml" title="FOAF" href="foaf.rdf" /&gt;</code></li></ul></li>
 </ol>
-<!--
-<fb:editor action="?do-it" labelwidth="100">
-     <fb:editor-text label="Title" name="title" value=""/>
-     <fb:editor-text label="Author" name="author" value=""/>
-     <fb:editor-custom label="Status">
-          <select name="state">
-               <option value="0" selected>have read</option>
-               <option value="1">am reading</option>
-               <option value="2">want to read</option>
-          </select>
-     </fb:editor-custom>
-     <fb:editor-textarea label="Comment" name="comment"/>
-     <fb:editor-buttonset>
-          <fb:editor-button value="Add"/>
-          <fb:editor-button value="Recommend"/>
-          <fb:editor-cancel />
-     </fb:editor-buttonset>
-</fb:editor>
--->
+
 <!--<form name="swe" action="{{=triplesbase}}" method="get">-->
 <fb:editor action="{{=triplesbase}}" labelwidth="200">
 <input type="hidden" name="uid" value="{{=uid}}" />
@@ -63,6 +45,10 @@ changes.</li>
 <fb:editor-button value="Download" name="submit" />
 </fb:editor-buttonset>
 </fb:editor>
+<p>
+<em><strong>Note:</strong> The download button provided on this page works only once, for your privacy.  Please reload the page if you wish to generate data with different options.  All data is created dynamically, and is not saved on servers outside of Facebook.</em>
+</p>
+
 <!--<p><a href="{{=tripleslink}}">Temporary Download</a> for currently selected format.</p>-->
 <!--
 <fb:tabs>
