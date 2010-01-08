@@ -17,6 +17,9 @@ from os import urandom
 foafp = "http://xmlns.com/foaf/0.1/"
 rdfs = "http://www.w3.org/2000/01/rdf-schema#"
 
+allowed_formats = ['rdf', 'n3', 'nt', 'turtle', 'pretty-xml']
+default_format = 'rdf'
+
 # prefix for saving facebook sessions: append uid, lookup, and get facebook session.
 fb_cache_prefix="facebook-"
 # prefix  for saving auth tokens: append uid, lookup, and get secret key
@@ -70,8 +73,8 @@ def index():
 
 def detect_requested_format():
     reqformat=request.vars.format
-    if (reqformat != 'n3' and reqformat != 'rdf' and reqformat != 'nt' and reqformat != 'turtle'):
-        reqformat = 'rdf'
+    if reqformat not in allowed_formats:
+        reqformat = default_format
     return reqformat
 
 # Generate an absolute link to raw triples, for direct downloads.
@@ -116,9 +119,9 @@ def triples():
     graph = fbgraph.graph
     tc = len(graph)
     graphserial = graph.serialize(format=reqformat)
-    if reqformat not in ['rdf', 'n3', 'nt', 'turtle']:
-        reqformat = 'rdf'
-    if reqformat == 'rdf':
+    if reqformat not in allowed_formats:
+        reqformat = default_format
+    if reqformat == 'rdf' or reqformat == 'pretty-xml':
         response.headers["Content-Type"] = "application/rdf+xml; charset=utf-8"
         response.headers["Content-disposition"] = "attachment; filename=foaf.rdf"
     elif reqformat == 'n3':
