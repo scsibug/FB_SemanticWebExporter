@@ -240,7 +240,7 @@ class FacebookGraph:
             self.addFriend(thisfriend)
 
     def addFriend(self,personRef):
-        self.attemptAddAsURI(self.me, URIRef(foafp+"knows"), personRef)
+        self.graph.add((self.me, URIRef(foafp+"knows"), personRef))
 
     def attemptAddAsLiteral(self, subj, pred, string):
         """Add a triple, if the literal string is defined."""
