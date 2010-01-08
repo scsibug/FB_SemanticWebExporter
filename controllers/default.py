@@ -15,6 +15,7 @@ from rdflib.constants import TYPE, VALUE
 from rdflib.TripleStore import TripleStore
 from os import urandom
 foafp = "http://xmlns.com/foaf/0.1/"
+rdfs = "http://www.w3.org/2000/01/rdf-schema#"
 
 # prefix for saving facebook sessions: append uid, lookup, and get facebook session.
 fb_cache_prefix="facebook-"
@@ -187,13 +188,13 @@ class FacebookGraph:
             self.me = user_uri
         else:
             self.me = URIRef("#me")
-        self.graph.add((self.me, TYPE, URIRef(foafp+"Person")))
         sr = self._userSearchResults(self.facebook.uid)
         self._generateUsersTriples(self.me,sr)
 
     def generateAccountProfile(self,personRef,name,profile_url):
         """Add fb account info for the foaf:person using their name and profile url."""
         account = BNode()
+        self.attemptAddAsLiteral(account, URIRef(rdfs+"label"), "Facebook account for "+name)
         self.graph.add((personRef, URIRef(foafp+"account"), account))
         self.attemptAddAsURI(account, TYPE, foafp+"OnlineAccount")
         self.attemptAddAsLiteral(account, URIRef(foafp+"accountName"), name)
@@ -201,6 +202,7 @@ class FacebookGraph:
         self.attemptAddAsURI(account, URIRef(foafp+"accountServiceHomepage"), "http://www.facebook.com/")
 
     def _generateUsersTriples(self,personURI,sr):
+        self.graph.add((personURI, TYPE, URIRef(foafp+"Person")))
         self.attemptAddAsLiteral(personURI,
                                  URIRef(foafp+"givenName"),
                                  sr[u'first_name'])
@@ -209,6 +211,7 @@ class FacebookGraph:
                                  sr[u'last_name'])
         if sr[u'first_name'] and sr[u'last_name']:
             name = sr[u'first_name']+" "+sr[u'last_name']
+            self.attemptAddAsLiteral(personURI,URIRef(rdfs+"label"),name)
             self.attemptAddAsLiteral(personURI,
                                      URIRef(foafp+"name"),
                                      sr[u'first_name']+" "+sr[u'last_name'])
