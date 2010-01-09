@@ -189,13 +189,13 @@ class FacebookGraph:
         sr = self._userSearchResults(self.facebook.uid)
         self._generateUsersTriples(self.me,sr)
 
-    def generateAccountProfile(self,personRef,name,profile_url):
-        """Add fb account info for the foaf:person using their name and profile url."""
+    def generateAccountProfile(self,personRef,uid,name,profile_url):
+        """Add fb account info for the foaf:person using their uid, name and profile url."""
         account = BNode()
         self.attemptAddAsLiteral(account, URIRef(rdfs+"label"), "Facebook account for "+name)
         self.graph.add((personRef, URIRef(foafp+"account"), account))
         self.attemptAddAsURI(account, TYPE, foafp+"OnlineAccount")
-        self.attemptAddAsLiteral(account, URIRef(foafp+"accountName"), name)
+        self.attemptAddAsLiteral(account, URIRef(foafp+"accountName"), uid)
         self.attemptAddAsURI(account, URIRef(foafp+"accountProfilePage"), profile_url)
         self.attemptAddAsURI(account, URIRef(foafp+"accountServiceHomepage"), "http://www.facebook.com/")
 
@@ -218,7 +218,7 @@ class FacebookGraph:
         sites = extract_homepages(sr[u'website'])
         for site in sites:
             self.attemptAddAsURI(personURI, URIRef(foafp+"homepage"), site)
-        self.generateAccountProfile(personURI, name, sr[u'profile_url'])
+        self.generateAccountProfile(personURI, str(sr[u'uid']), name, sr[u'profile_url'])
 
     def generateFriendTriples(self,limit=None):
         """Add all friend entries.  Optional limit on friends added."""
