@@ -14,8 +14,11 @@ from rdflib import URIRef
 from rdflib.constants import TYPE, VALUE
 from rdflib.TripleStore import TripleStore
 from os import urandom
+
 foafp = "http://xmlns.com/foaf/0.1/"
 rdfs = "http://www.w3.org/2000/01/rdf-schema#"
+sioc = "http://rdfs.org/sioc/ns#"
+dc = "http://purl.org/dc/elements/1.1/"
 
 allowed_formats = ['rdf', 'n3', 'nt', 'turtle', 'pretty-xml']
 default_format = 'rdf'
@@ -105,12 +108,13 @@ def triples():
         return "Not authorized, or this link has expired."
     reqformat = detect_requested_format()
     fbgraph = FacebookGraph(facebook)
-    if foaf_person:
-        fbgraph.generateThisUsersTriples(user_uri=URIRef(foaf_person))
-    else:
-        fbgraph.generateThisUsersTriples()
+    # If not provided, make up a relative foaf Person URI
+    if not foaf_person:
+        foaf_person = URIRef("#me")
+    fbgraph.generateThisUsersTriples(user_uri=URIRef(foaf_person))
     if include_friends and include_friends == 'true':
         fbgraph.generateFriendTriples()
+    fbgraph.addGroupsForUser(facebook.uid, foaf_person)
     graph = fbgraph.graph
     tc = len(graph)
     graphserial = graph.serialize(format=reqformat)
@@ -179,6 +183,8 @@ class FacebookGraph:
         self.graph = Graph()
         # Setup prefixes
         self.graph.bind("foaf", foafp)
+        self.graph.bind("rdfs", rdfs)
+        self.graph.bind("sioc", sioc)
 
     def generateThisUsersTriples(self,user_uri=None):
         """Generate triples for the facebook user."""
@@ -195,6 +201,7 @@ class FacebookGraph:
         self.attemptAddAsLiteral(account, URIRef(rdfs+"label"), "Facebook account for "+name)
         self.graph.add((personRef, URIRef(foafp+"account"), account))
         self.attemptAddAsURI(account, TYPE, foafp+"OnlineAccount")
+        self.attemptAddAsURI(account, TYPE, sioc+"User")
         self.attemptAddAsLiteral(account, URIRef(foafp+"accountName"), uid)
         self.attemptAddAsURI(account, URIRef(foafp+"accountProfilePage"), profile_url)
         self.attemptAddAsURI(account, URIRef(foafp+"accountServiceHomepage"), "http://www.facebook.com/")
@@ -233,6 +240,10 @@ class FacebookGraph:
             thisfriend = BNode()
             self._generateUsersTriples(thisfriend,fresult)
             self.addFriend(thisfriend)
+            # add group memberships (takes a long time!)
+            self.addGroupsForUser(str(fresult[u'uid']), thisfriend)
+
+
 
     def addFriend(self,personRef):
         self.graph.add((self.me, URIRef(foafp+"knows"), personRef))
@@ -246,6 +257,19 @@ class FacebookGraph:
         """Add a triple, if the URI is defined."""
         if uri:
             self.graph.add((subj,pred,URIRef(uri)))
+
+    def addGroupsForUser(self,uid,subject):
+        groupquery = "SELECT gid, name, nid, description, group_type, group_subtype, recent_news, pic, pic_big, pic_small, creator, update_time, office, website, venue FROM group WHERE gid IN (SELECT gid FROM group_member WHERE uid=%s) AND privacy='OPEN'" % (uid)
+        groupresults = self.facebook.fql.query(groupquery)
+        for group in groupresults:
+            # Create ref for the group
+            group_url = URIRef("http://www.facebook.com/group.php?gid="+str(group[u'gid']))
+            self.attemptAddAsLiteral(group_url, URIRef(rdfs+"label"), group[u'name'])
+            self.graph.add((group_url, TYPE, URIRef(sioc+"UserGroup")))
+            self.attemptAddAsLiteral(group_url, URIRef(dc+"description"), group[u'description'])
+            self.attemptAddAsURI(group_url, URIRef(foafp+"depiction"), group[u'pic_big'])
+            self.graph.add((subject, URIRef(sioc+"member_of"), group_url))
+            self.graph.add((group_url, URIRef(sioc+"has_member"), subject))
 
     def _userSearchResults(self, uid):
         """Return search results for a given user"""
