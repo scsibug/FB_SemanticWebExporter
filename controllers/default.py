@@ -26,13 +26,8 @@ fb_cache_prefix="facebook-"
 token_cache_prefix="swe_token-"
 
 # TODO:
-# Don't display triples directly, after ~3000, facebook times out in displaying the page
-# Generic functions to add triples from either friends or myself.
-# request users email and foaf:Person URI
-# Allow users to show only their info, not their friends.
+# request users email
 # Publish aggregate data about # of triples served, unique users, etc.
-# Direct links are broken when running web2py multiprocess.
-#      Need to store tokens in DB, not cache.
 # Personal profile document tags, creation date, etc.
 
 def index():
