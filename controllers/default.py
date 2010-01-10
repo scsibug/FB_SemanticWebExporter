@@ -32,6 +32,7 @@ token_cache_prefix="swe_token-"
 # request users email
 # Publish aggregate data about # of triples served, unique users, etc.
 # Personal profile document tags, creation date, etc.
+# Improve friend group-membership lookup, currently very slow
 
 def index():
     require_facebook_login(request,fb_settings)
@@ -92,7 +93,8 @@ def triples():
     provided_token = request.vars.swe_token # secret token from user
     fb_uid = request.vars.uid # users facebook UID
     foaf_person = request.vars.foaf_person # foaf person URI
-    include_friends = request.vars.include_friends # 'true' or 'false'
+    include_friends = request.vars.include_friends == 'true'
+    include_friends_groups = request.vars.include_friends_groups == 'true'
     facebook = cache.ram(fb_cache_prefix+fb_uid, lambda:None)
     # Don't allow the link to be reused.
     cache.ram.clear(regex=fb_cache_prefix+fb_uid)
@@ -112,8 +114,9 @@ def triples():
     if not foaf_person:
         foaf_person = URIRef("#me")
     fbgraph.generateThisUsersTriples(user_uri=URIRef(foaf_person))
-    if include_friends and include_friends == 'true':
-        fbgraph.generateFriendTriples()
+    if include_friends:
+        fbgraph.generateFriendTriples(include_groups=include_friends_groups)
+    # Add my groups...
     fbgraph.addGroupsForUser(facebook.uid, foaf_person)
     graph = fbgraph.graph
     tc = len(graph)
@@ -227,7 +230,7 @@ class FacebookGraph:
             self.attemptAddAsURI(personURI, URIRef(foafp+"homepage"), site)
         self.generateAccountProfile(personURI, str(sr[u'uid']), name, sr[u'profile_url'])
 
-    def generateFriendTriples(self,limit=None):
+    def generateFriendTriples(self,limit=None, include_groups=False):
         """Add all friend entries.  Optional limit on friends added."""
         if limit:
             limit_stmt = " LIMIT "+str(limit)
@@ -241,9 +244,8 @@ class FacebookGraph:
             self._generateUsersTriples(thisfriend,fresult)
             self.addFriend(thisfriend)
             # add group memberships (takes a long time!)
-            self.addGroupsForUser(str(fresult[u'uid']), thisfriend)
-
-
+            if include_groups:
+                self.addGroupsForUser(str(fresult[u'uid']), thisfriend)
 
     def addFriend(self,personRef):
         self.graph.add((self.me, URIRef(foafp+"knows"), personRef))
