@@ -93,8 +93,12 @@ def triples():
     provided_token = request.vars.swe_token # secret token from user
     fb_uid = request.vars.uid # users facebook UID
     foaf_person = request.vars.foaf_person # foaf person URI
-    include_friends = request.vars.include_friends == 'true'
-    include_friends_groups = request.vars.include_friends_groups == 'true'
+    include_friends = False
+    include_friends_groups = False
+    if request.vars.include_friends:
+        include_friends = (request.vars.include_friends == 'true')
+    if request.vars.include_friends_groups:
+        include_friends_groups = (request.vars.include_friends_groups == 'true')
     facebook = cache.ram(fb_cache_prefix+fb_uid, lambda:None)
     # Don't allow the link to be reused.
     cache.ram.clear(regex=fb_cache_prefix+fb_uid)
@@ -110,14 +114,15 @@ def triples():
         return "Not authorized, or this link has expired."
     reqformat = detect_requested_format()
     fbgraph = FacebookGraph(facebook)
-    # If not provided, make up a relative foaf Person URI
-    if not foaf_person:
-        foaf_person = URIRef("#me")
-    fbgraph.generateThisUsersTriples(user_uri=URIRef(foaf_person))
+    fbgraph.generateThisUsersTriples()
     if include_friends:
         fbgraph.generateFriendTriples(include_groups=include_friends_groups)
     # Add my groups...
-    fbgraph.addGroupsForUser(facebook.uid, foaf_person)
+    #fbgraph.addGroupsForUser(facebook.uid, foaf_person)
+    # Add all groups for current user
+    fbgraph.addAllKnownGroups(facebook.uid)
+    # Relate groups and persons
+    fbgraph.createGroupMemberships()
     graph = fbgraph.graph
     tc = len(graph)
     graphserial = graph.serialize(format=reqformat)
@@ -181,20 +186,22 @@ def extract_homepages(website_field):
 
 class FacebookGraph:
     """RDF graph for facebook data."""
-    def __init__(self, facebook):
+    def __init__(self, facebook, foaf_uri=URIRef("#me")):
         self.facebook = facebook
         self.graph = Graph()
         # Setup prefixes
         self.graph.bind("foaf", foafp)
         self.graph.bind("rdfs", rdfs)
         self.graph.bind("sioc", sioc)
+        # URI dictionaries
+        # map uid strings to URIs
+        self.me = foaf_uri
+        self.person_uris = { self.facebook.uid : foaf_uri }
+        # map gid strings to URIs
+        self.group_uris = {}
 
-    def generateThisUsersTriples(self,user_uri=None):
+    def generateThisUsersTriples(self):
         """Generate triples for the facebook user."""
-        if user_uri:
-            self.me = user_uri
-        else:
-            self.me = URIRef("#me")
         sr = self._userSearchResults(self.facebook.uid)
         self._generateUsersTriples(self.me,sr)
 
@@ -240,12 +247,19 @@ class FacebookGraph:
         friendquery = "SELECT uid, first_name, last_name, pic, sex, current_location, profile_url, website FROM user WHERE uid IN (SELECT uid2 FROM friend WHERE uid1 = %s) %s" % (self.facebook.uid, limit_stmt)
         friendresults = self.facebook.fql.query(friendquery)
         for fresult in friendresults:
-            thisfriend = BNode()
+            thisfriend = self.getPersonURI(str(fresult[u'uid']))
             self._generateUsersTriples(thisfriend,fresult)
             self.addFriend(thisfriend)
-            # add group memberships (takes a long time!)
-            if include_groups:
-                self.addGroupsForUser(str(fresult[u'uid']), thisfriend)
+        # After friends have been added, add friends groups
+        if include_groups:
+            self.addAllKnownGroups(friends=True)
+
+    def getPersonURI(self,uid):
+        """Given a facebook uid string, return the URI representing them."""
+        if uid not in self.person_uris:
+            personuri = BNode()
+            self.person_uris[uid] = personuri
+        return self.person_uris[uid]
 
     def addFriend(self,personRef):
         self.graph.add((self.me, URIRef(foafp+"knows"), personRef))
@@ -260,18 +274,47 @@ class FacebookGraph:
         if uri:
             self.graph.add((subj,pred,URIRef(uri)))
 
-    def addGroupsForUser(self,uid,subject):
-        groupquery = "SELECT gid, name, nid, description, group_type, group_subtype, recent_news, pic, pic_big, pic_small, creator, update_time, office, website, venue FROM group WHERE gid IN (SELECT gid FROM group_member WHERE uid=%s) AND privacy='OPEN'" % (uid)
+    def addAllKnownGroups(self,friends=False):
+        """Add facebook groups, by default just for current user, if friends=True, then all friends are included."""
+        if friends == True: # why does "if friends:" not work here?
+            groupquery = "SELECT gid, name, nid, description, group_type, group_subtype, recent_news, pic, pic_big, pic_small, creator, update_time, office, website, venue FROM group WHERE gid IN (SELECT gid FROM group_member WHERE uid in (SELECT uid2 FROM friend WHERE uid1 = %s) or uid in %s)" % (self.facebook.uid,self.facebook.uid)
+        else:
+            groupquery = "SELECT gid, name, nid, description, group_type, group_subtype, recent_news, pic, pic_big, pic_small, creator, update_time, office, website, venue FROM group WHERE gid IN (SELECT gid FROM group_member WHERE uid in %s)" % (self.facebook.uid)
         groupresults = self.facebook.fql.query(groupquery)
+        # Construct all the group instances.  Make note of gid->URI mapping.
         for group in groupresults:
-            # Create ref for the group
             group_url = URIRef("http://www.facebook.com/group.php?gid="+str(group[u'gid']))
+            gid = group[u'gid']
+            self.group_uris[str(group[u'gid'])] = group_url
             self.attemptAddAsLiteral(group_url, URIRef(rdfs+"label"), group[u'name'])
             self.graph.add((group_url, TYPE, URIRef(sioc+"UserGroup")))
+            self.graph.add((group_url, TYPE, URIRef(foafp+"Group")))
+            group_type = group[u'group_type']
+            if group_type and group_type == 'Organizations':
+                self.graph.add((group_url, TYPE, URIRef(foafp+"Organization")))
+            sites = extract_homepages(group[u'website'])
+            for site in sites:
+                self.attemptAddAsURI(group_url, URIRef(foafp+"homepage"), site)
             self.attemptAddAsLiteral(group_url, URIRef(dc+"description"), group[u'description'])
             self.attemptAddAsURI(group_url, URIRef(foafp+"depiction"), group[u'pic_big'])
-            self.graph.add((subject, URIRef(sioc+"member_of"), group_url))
-            self.graph.add((group_url, URIRef(sioc+"has_member"), subject))
+
+    def createGroupMemberships(self):
+        """Create group memberships for all retrieved persons/groups."""
+        membershipquery = "SELECT uid, gid FROM group_member WHERE uid in (SELECT uid2 FROM friend WHERE uid1 = %s) or uid in %s" % (self.facebook.uid,self.facebook.uid)
+        mresults = self.facebook.fql.query(membershipquery)
+        # Foreach member/group relation:
+        for member in mresults:
+            uid = str(member[u'uid'])
+            gid = str(member[u'gid'])
+            # check if person and group were retrieved previously, if
+            # they were not, don't attempt to add the membership
+            # relationship.
+            if (self.person_uris.has_key(uid)) and (self.group_uris.has_key(gid)):
+                puri = self.person_uris[uid]
+                guri = self.group_uris[gid]
+                self.graph.add((puri, URIRef(sioc+"member_of"), guri))
+                self.graph.add((guri, URIRef(sioc+"has_member"), puri))
+                self.graph.add((guri, URIRef(foafp+"member"), puri))
 
     def _userSearchResults(self, uid):
         """Return search results for a given user"""

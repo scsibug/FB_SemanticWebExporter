@@ -29,16 +29,19 @@ changes.</li>
 <input type="hidden" name="swe_token" value="{{=swe_token}}" />
 <fb:editor-text label="FOAF Person URI (optional)" name="foaf_person" placeholder="this is optional" />
 <fb:editor-custom label="Include Friends">
-<select name="include_friends">
+<input type="checkbox" name="include_friends" value="true" checked="true"/>
+<br />
+<!--<select name="include_friends">
 <option value="true" selected>Yes</option>
 <option value="false">No</option>
-</select>
+</select>-->
 </fb:editor-custom>
 <fb:editor-custom label="Include Friends' Groups (may be slow)">
-<select name="include_friends_groups">
+<input type="checkbox" name="include_friends_groups" value="true" checked="true"/>
+<!--<select name="include_friends_groups">
 <option value="true">Yes</option>
 <option value="false" selected>No</option>
-</select>
+</select>-->
 </fb:editor-custom>
 <fb:editor-custom label="Format">
 <select name="format">
