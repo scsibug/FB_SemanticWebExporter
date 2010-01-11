@@ -39,7 +39,7 @@ def index():
     start_time = time.time()
     facebook=request.facebook
     reqformat = detect_requested_format()
-    fbgraph = FacebookGraph(facebook)
+    fbgraph = FacebookGraph(facebook,foaf_uri=None)
     fbgraph.generateThisUsersTriples()
     fbgraph.generateFriendTriples(limit=2)
     graph = fbgraph.graph
@@ -113,7 +113,7 @@ def triples():
     elif (correct_token != provided_token):
         return "Not authorized, or this link has expired."
     reqformat = detect_requested_format()
-    fbgraph = FacebookGraph(facebook)
+    fbgraph = FacebookGraph(facebook, foaf_uri=foaf_person)
     fbgraph.generateThisUsersTriples()
     if include_friends:
         fbgraph.generateFriendTriples(include_groups=include_friends_groups)
@@ -186,7 +186,7 @@ def extract_homepages(website_field):
 
 class FacebookGraph:
     """RDF graph for facebook data."""
-    def __init__(self, facebook, foaf_uri=URIRef("#me")):
+    def __init__(self, facebook, foaf_uri):
         self.facebook = facebook
         self.graph = Graph()
         # Setup prefixes
@@ -195,6 +195,8 @@ class FacebookGraph:
         self.graph.bind("sioc", sioc)
         # URI dictionaries
         # map uid strings to URIs
+        if not foaf_uri:
+            foaf_uri = URIRef("#me")
         self.me = foaf_uri
         self.person_uris = { self.facebook.uid : foaf_uri }
         # map gid strings to URIs
