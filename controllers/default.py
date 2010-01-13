@@ -193,6 +193,7 @@ class FacebookGraph:
         self.graph.bind("foaf", foafp)
         self.graph.bind("rdfs", rdfs)
         self.graph.bind("sioc", sioc)
+        self.graph.bind("dc", dc)
         # URI dictionaries
         # map uid strings to URIs
         if not foaf_uri:
