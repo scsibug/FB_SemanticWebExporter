@@ -234,9 +234,9 @@ class FacebookGraph:
             self.attemptAddAsLiteral(personURI,
                                      URIRef(foafp+"name"),
                                      sr[u'first_name']+" "+sr[u'last_name'])
-        else if sr[u'first_name']:
+        elsif sr[u'first_name']:
             name = sr[u'first_name']
-        else if sr[u'last_name']:
+        elsif sr[u'last_name']:
             name = sr[u'last_name']
         else:
             name = ""
