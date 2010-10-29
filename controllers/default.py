@@ -211,7 +211,8 @@ class FacebookGraph:
     def generateAccountProfile(self,personRef,uid,name,profile_url):
         """Add fb account info for the foaf:person using their uid, name and profile url."""
         account = BNode()
-        self.attemptAddAsLiteral(account, URIRef(rdfs+"label"), "Facebook account for "+name)
+        if name:
+            self.attemptAddAsLiteral(account, URIRef(rdfs+"label"), "Facebook account for "+name)
         self.graph.add((personRef, URIRef(foafp+"account"), account))
         self.attemptAddAsURI(account, TYPE, foafp+"OnlineAccount")
         self.attemptAddAsURI(account, TYPE, sioc+"User")
@@ -233,6 +234,12 @@ class FacebookGraph:
             self.attemptAddAsLiteral(personURI,
                                      URIRef(foafp+"name"),
                                      sr[u'first_name']+" "+sr[u'last_name'])
+        else if sr[u'first_name']:
+            name = sr[u'first_name']
+        else if sr[u'last_name']:
+            name = sr[u'last_name']
+        else:
+            name = ""
         self.attemptAddAsLiteral(personURI,URIRef(foafp+"gender"),sr[u'sex'])
         self.attemptAddAsURI(personURI, URIRef(foafp+"img"), sr[u'pic'])
         sites = extract_homepages(sr[u'website'])
