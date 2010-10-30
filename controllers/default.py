@@ -11,7 +11,7 @@ from rdflib import Namespace
 from rdflib import Literal
 from rdflib import BNode
 from rdflib import URIRef
-from rdflib.constants import TYPE, VALUE
+from rdflib.RDF import type
 from rdflib.TripleStore import TripleStore
 from os import urandom
 
@@ -216,14 +216,14 @@ class FacebookGraph:
         if name:
             self.attemptAddAsLiteral(account, URIRef(rdfs+"label"), "Facebook account for "+name)
         self.graph.add((personRef, URIRef(foafp+"account"), account))
-        self.attemptAddAsURI(account, TYPE, foafp+"OnlineAccount")
-        self.attemptAddAsURI(account, TYPE, sioc+"User")
+        self.attemptAddAsURI(account, type, foafp+"OnlineAccount")
+        self.attemptAddAsURI(account, type, sioc+"User")
         self.attemptAddAsLiteral(account, URIRef(foafp+"accountName"), uid)
         self.attemptAddAsURI(account, URIRef(foafp+"accountProfilePage"), profile_url)
         self.attemptAddAsURI(account, URIRef(foafp+"accountServiceHomepage"), "http://www.facebook.com/")
 
     def _generateUsersTriples(self,personURI,sr):
-        self.graph.add((personURI, TYPE, URIRef(foafp+"Person")))
+        self.graph.add((personURI, type, URIRef(foafp+"Person")))
         self.attemptAddAsLiteral(personURI,
                                  URIRef(foafp+"givenName"),
                                  sr[u'first_name'])
@@ -299,11 +299,11 @@ class FacebookGraph:
             gid = group[u'gid']
             self.group_uris[str(group[u'gid'])] = group_url
             self.attemptAddAsLiteral(group_url, URIRef(rdfs+"label"), group[u'name'])
-            self.graph.add((group_url, TYPE, URIRef(sioc+"UserGroup")))
-            self.graph.add((group_url, TYPE, URIRef(foafp+"Group")))
+            self.graph.add((group_url, type, URIRef(sioc+"UserGroup")))
+            self.graph.add((group_url, type, URIRef(foafp+"Group")))
             group_type = group[u'group_type']
             if group_type and group_type == 'Organizations':
-                self.graph.add((group_url, TYPE, URIRef(foafp+"Organization")))
+                self.graph.add((group_url, type, URIRef(foafp+"Organization")))
             sites = extract_homepages(group[u'website'])
             for site in sites:
                 self.attemptAddAsURI(group_url, URIRef(foafp+"homepage"), site)
