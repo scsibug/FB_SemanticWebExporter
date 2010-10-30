@@ -126,7 +126,7 @@ def triples():
     graphserial = graph.serialize(format=reqformat)
     if reqformat not in allowed_formats:
         reqformat = default_format
-    if reqformat == 'rdf' or reqformat == 'pretty-xml':
+    if reqformat == 'xml' or reqformat == 'pretty-xml':
         response.headers["Content-Type"] = "application/rdf+xml; charset=utf-8"
         response.headers["Content-disposition"] = "attachment; filename=foaf.rdf"
     elif reqformat == 'n3':
