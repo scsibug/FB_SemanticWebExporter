@@ -198,6 +198,8 @@ class FacebookGraph:
         # map uid strings to URIs
         if not foaf_uri:
             foaf_uri = URIRef("#me")
+        else:
+            foaf_uri = URIRef(foaf_uri)
         self.me = foaf_uri
         self.person_uris = { self.facebook.uid : foaf_uri }
         # map gid strings to URIs
